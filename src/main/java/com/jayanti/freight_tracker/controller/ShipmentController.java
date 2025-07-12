@@ -4,44 +4,99 @@ import com.jayanti.freight_tracker.dto.ShipmentStatsDTO;
 import com.jayanti.freight_tracker.model.Shipment;
 import com.jayanti.freight_tracker.model.ShipmentStatus;
 import com.jayanti.freight_tracker.repository.ShipmentRepository;
+import com.jayanti.freight_tracker.websocket.ShipmentStatusBroadcaster;
+import com.jayanti.freight_tracker.websocket.ShipmentUpdateMessage;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Page;
+import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Optional;
-
 import java.util.Arrays;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-
 @RestController //handles http requests and returns json responses
-@RequestMapping("/api/shipments") //common base url for all endpoints
+@RequestMapping("/api/shipments") //common base url for all endpoint
 public class ShipmentController {
 
     @Autowired
     private ShipmentRepository shipmentRepository;
 
-    // Create a new shipment
+    @Autowired
+    private ShipmentStatusBroadcaster broadcaster;
+
     @PostMapping
     public Shipment createShipment(@RequestBody Shipment shipment) {
         shipment.setLastUpdatedTime(LocalDateTime.now());
-        return shipmentRepository.save(shipment);
+        Shipment saved = shipmentRepository.save(shipment);
+
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm");
+
+        // Broadcast update via WebSocket
+        broadcaster.broadcastUpdate(
+                ShipmentUpdateMessage.builder()
+                        .shipmentId(saved.getId())
+                        .trackingNumber(saved.getTrackingNumber())
+                        .status(saved.getStatus())
+                        .lastUpdatedTime(saved.getLastUpdatedTime().format(formatter))
+                        .build()
+        );
+
+        return saved;
     }
 
-    // Get all shipments
     @GetMapping
     public List<Shipment> getAllShipments() {
         return shipmentRepository.findAll();
     }
 
-    // Get shipment by ID
     @GetMapping("/{id}")
     public Optional<Shipment> getShipmentById(@PathVariable Long id) {
         return shipmentRepository.findById(id);
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<Shipment> updateShipment(@PathVariable Long id, @RequestBody Shipment updatedShipment) {
+        return shipmentRepository.findById(id)
+                .map(shipment -> {
+                    shipment.setOrigin(updatedShipment.getOrigin());
+                    shipment.setDestination(updatedShipment.getDestination());
+                    shipment.setStatus(updatedShipment.getStatus());
+                    shipment.setLastUpdatedTime(LocalDateTime.now());
+                    shipment.setTrackingNumber(updatedShipment.getTrackingNumber());
+                    shipment.setCarrier(updatedShipment.getCarrier());
+                    shipment.setPriority(updatedShipment.getPriority());
+                    Shipment saved = shipmentRepository.save(shipment);
+
+                    DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd-MM-yyyy HH:mm");
+
+                    // Broadcast update
+                    broadcaster.broadcastUpdate(
+                            ShipmentUpdateMessage.builder()
+                                    .shipmentId(saved.getId())
+                                    .trackingNumber(saved.getTrackingNumber())
+                                    .status(saved.getStatus())
+                                    .lastUpdatedTime(saved.getLastUpdatedTime().format(formatter))
+                                    .build()
+                    );
+
+                    return ResponseEntity.ok(saved);
+                })
+                .orElse(ResponseEntity.notFound().build());
+    }
+
+    @DeleteMapping("/{id}")
+    public String deleteShipment(@PathVariable Long id) {
+        if (!shipmentRepository.existsById(id)) {
+            throw new RuntimeException("Shipment not found with id " + id);
+        }
+        shipmentRepository.deleteById(id);
+        return "Shipment with ID " + id + " has been deleted.";
     }
 
     @GetMapping("/search")
@@ -59,31 +114,6 @@ public class ShipmentController {
         } else {
             return shipmentRepository.findAll(pageable);
         }
-    }
-
-    @PutMapping("/{id}")
-    public Shipment updateShipment(@PathVariable Long id, @RequestBody Shipment updatedShipment) {
-        return shipmentRepository.findById(id)
-                .map(shipment -> {
-                    shipment.setOrigin(updatedShipment.getOrigin());
-                    shipment.setDestination(updatedShipment.getDestination());
-                    shipment.setStatus(updatedShipment.getStatus());
-                    shipment.setLastUpdatedTime(LocalDateTime.now());
-                    shipment.setTrackingNumber(updatedShipment.getTrackingNumber());
-                    shipment.setCarrier(updatedShipment.getCarrier());
-                    shipment.setPriority(updatedShipment.getPriority());
-                    return shipmentRepository.save(shipment);
-                })
-                .orElseThrow(() -> new RuntimeException("Shipment not found with id " + id));
-    }
-
-    @DeleteMapping("/{id}")
-    public String deleteShipment(@PathVariable Long id) {
-        if (!shipmentRepository.existsById(id)) {
-            throw new RuntimeException("Shipment not found with id " + id);
-        }
-        shipmentRepository.deleteById(id);
-        return "Shipment with ID " + id + " has been deleted.";
     }
 
     @GetMapping("/stats")
