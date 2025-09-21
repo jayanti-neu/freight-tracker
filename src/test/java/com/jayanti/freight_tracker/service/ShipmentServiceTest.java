@@ -68,7 +68,7 @@ class ShipmentServiceTest {
 
         // Verify broadcaster called
         // broadcaster should send a ShipmentUpdateMessage and its called once
-        verify(broadcaster, times(1)).broadcastUpdate(any(ShipmentUpdateMessage.class));
+        verify(broadcaster, times(1)).broadcastUpdate(any(Shipment.class));
     }
 
     // -------- GET BY ID TEST --------
@@ -120,7 +120,7 @@ class ShipmentServiceTest {
         assertEquals(ShipmentStatus.DELIVERED, updated.getStatus());
         assertNotNull(updated.getLastUpdatedTime());
 
-        verify(broadcaster, times(1)).broadcastUpdate(any(ShipmentUpdateMessage.class));
+        verify(broadcaster, times(1)).broadcastUpdate(any(Shipment.class));
     }
 
     // -------- DELETE TEST --------
