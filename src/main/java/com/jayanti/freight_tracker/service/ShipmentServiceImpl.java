@@ -47,14 +47,7 @@ public class   ShipmentServiceImpl implements ShipmentService {
         Shipment saved = shipmentRepository.save(shipment);
 
         // Broadcast real-time update
-        broadcaster.broadcastUpdate(
-                ShipmentUpdateMessage.builder()
-                        .shipmentId(saved.getId())
-                        .trackingNumber(saved.getTrackingNumber())
-                        .status(saved.getStatus())
-                        .lastUpdatedTime(format(saved.getLastUpdatedTime()))
-                        .build()
-        );
+        broadcaster.broadcastUpdate(saved);
 
         return saved;
     }
@@ -89,14 +82,7 @@ public class   ShipmentServiceImpl implements ShipmentService {
                     Shipment saved = shipmentRepository.save(shipment);
 
                     // Broadcast real-time update
-                    broadcaster.broadcastUpdate(
-                            ShipmentUpdateMessage.builder()
-                                    .shipmentId(saved.getId())
-                                    .trackingNumber(saved.getTrackingNumber())
-                                    .status(saved.getStatus())
-                                    .lastUpdatedTime(format(saved.getLastUpdatedTime()))
-                                    .build()
-                    );
+                    broadcaster.broadcastUpdate(saved);
 
                     return saved;
                 })
